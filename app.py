@@ -4,6 +4,8 @@ import psycopg2
 
 # Initialize Flask app
 app = Flask(__name__)
+app.debug = True
+
 
 # Fetch database credentials from environment variables
 DB_HOST = os.environ.get("DB_HOST")
@@ -103,16 +105,19 @@ def edit_patient(patient_id):
 
 @app.route('/delete_patient/<int:patient_id>', methods=['POST'])
 def delete_patient(patient_id):
-    conn = get_db_connection()
-    if conn:
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM patients WHERE id = %s;", (patient_id,))
-        conn.commit()
-        cursor.close()
-        conn.close()
-        return redirect(url_for('index'))
-    else:
-        return "Error connecting to database."
+    try:
+        conn = get_db_connection()
+        if conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM patients WHERE id = %s;", (patient_id,))
+            conn.commit()
+            cursor.close()
+            conn.close()
+            return redirect(url_for('index'))
+        else:
+            return "Error connecting to database."
+    except Exception as e:
+        return f"An error occurred: {e}"
 
 if __name__ == '__main__':
     app.run(debug=True)
