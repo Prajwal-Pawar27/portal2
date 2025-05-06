@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="card p-4 shadow-sm">
+        <h2 class="text-center mb-4">Follow Up for Patient</h2>
+        <form method="POST">
+            <!-- UHID -->
+            <div class="form-group">
+                <label for="uhid">UHID</label>
+                <input type="text" name="uhid" class="form-control" id="uhid" required placeholder="Enter UHID">
+            </div>
+
+            <!-- Name -->
+            <div class="form-group">
+                <label for="name">Name</label>
+                <input type="text" name="name" class="form-control" id="name" required placeholder="Enter Patient Name">
+            </div>
+
+            <!-- Age -->
+            <div class="form-group">
+                <label for="age">Age</label>
+                <input type="number" name="age" class="form-control" id="age" required placeholder="Enter Age">
+            </div>
+
+            <!-- Sex -->
+            <div class="form-group">
+                <label for="sex">Sex</label>
+                <select name="sex" class="form-control" id="sex" required>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+
+            <!-- Remarks -->
+            <div class="form-group">
+                <label for="remarks">Remarks</label>
+                <input type="text" name="remarks" class="form-control" id="remarks" placeholder="Enter remarks for follow-up">
+            </div>
+
+            <!-- Submit Button -->
+            <div class="text-center">
+                <button type="submit" class="btn btn-primary btn-lg mt-3">Add Follow-Up</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="search-container">
+    <form method="get" action="{{ url_for('patient_info') }}">
+        <input type="text" name="search" class="form-control" placeholder="Search by name or UHID" value="{{ query }}">
+        <button type="submit" class="btn btn-primary">Search</button>
+    </form>
+</div>
+
+{% if patients %}
+    <table class="table table-bordered mt-4">
+        <thead>
+            <tr>
+                <th>SL No.</th>  <!-- Changed ID to SL No. -->
+                <th>UHID</th>
+                <th>Name</th>
+                <th>Age</th>
+                <th>Sex</th>
+                <th>Remarks</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for patient in patients %}
+            <tr>
+                <!-- Display Serial Number (SL No.) dynamically -->
+                <td>{{ loop.index }}</td>  <!-- Serial Number will be the loop index -->
+                <td>{{ patient[1] }}</td>
+                <td>{{ patient[2] }}</td>
+                <td>{{ patient[3] }}</td>
+                <td>{{ patient[4] }}</td>
+                <td>{{ patient[5] }}</td>
+                <td>
+                    <a href="{{ url_for('edit_patient', id=patient[0]) }}" class="btn btn-warning btn-sm">Edit</a>
+                    <a href="{{ url_for('delete_patient', id=patient[0]) }}" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete this patient?');">Delete</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p>No patients found.</p>
+{% endif %}
+{% endblock %}
