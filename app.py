@@ -99,7 +99,6 @@ def delete_patient(id):
     conn = get_db_connection()
     cursor = conn.cursor()  # Create cursor to execute queries
     cursor.execute("DELETE FROM patients WHERE id=%s", (id,))
-    cursor.execute("DELETE FROM sqlite_sequence WHERE name='patients'")  # Clear sequence if using SQLite
     conn.commit()
     conn.close()
     return redirect(url_for('patient_info'))
