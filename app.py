@@ -1,127 +1,118 @@
 import os
-import psycopg2
 from flask import Flask, render_template, request, redirect, url_for
+import psycopg2
 
+# Initialize Flask app
 app = Flask(__name__)
 
-# Use the external DATABASE_URL from environment variables
-DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://patient_db_lukp_user:0uQieJtukroY5HldFbHvDNrGAAt5pH3r@dpg-d0d3ce24d50c73edp4o0-a.singapore-postgres.render.com/patient_db_lukp')
+# Fetch database credentials from environment variables
+DB_HOST = os.environ.get("DB_HOST")
+DB_NAME = os.environ.get("DB_NAME")
+DB_USER = os.environ.get("DB_USER")
+DB_PASSWORD = os.environ.get("DB_PASSWORD")
 
-# --- Helper to get DB connection ---
+# Check if the required environment variables are set
+if not all([DB_HOST, DB_NAME, DB_USER, DB_PASSWORD]):
+    raise ValueError("One or more environment variables (DB_HOST, DB_NAME, DB_USER, DB_PASSWORD) are missing")
+
+# Database connection function
 def get_db_connection():
-    conn = psycopg2.connect(DATABASE_URL)
-    return conn
+    try:
+        conn = psycopg2.connect(
+            host=DB_HOST,
+            database=DB_NAME,
+            user=DB_USER,
+            password=DB_PASSWORD
+        )
+        return conn
+    except Exception as e:
+        print(f"Error connecting to the database: {e}")
+        return None
 
-# --- Home Page ---
 @app.route('/')
-def home():
-    return render_template('index.html', consultants="Dr. Y.S. Pawar & Dr. Manjula")
+def index():
+    conn = get_db_connection()
+    if conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM patients;")
+        patients = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return render_template('index.html', patients=patients)
+    else:
+        return "Error connecting to database."
 
-
-# --- Add New Patient ---
-@app.route('/new', methods=['GET', 'POST'])
+@app.route('/new_patient', methods=['GET', 'POST'])
 def new_patient():
     if request.method == 'POST':
-        uhid = request.form['uhid']
         name = request.form['name']
         age = request.form['age']
-        sex = request.form['sex']
-        remarks = request.form['remarks']
+        gender = request.form['gender']
+        address = request.form['address']
+        contact = request.form['contact']
 
         conn = get_db_connection()
-        cursor = conn.cursor()  # Create cursor to execute queries
-        cursor.execute("INSERT INTO patients (uhid, name, age, sex, remarks) VALUES (%s, %s, %s, %s, %s)",
-                       (uhid, name, age, sex, remarks))
-        conn.commit()
-        conn.close()
-        return redirect(url_for('home'))
-    return render_template('new.html')
+        if conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO patients (name, age, gender, address, contact)
+                VALUES (%s, %s, %s, %s, %s);
+            """, (name, age, gender, address, contact))
+            conn.commit()
+            cursor.close()
+            conn.close()
+            return redirect(url_for('index'))
+        else:
+            return "Error connecting to database."
 
-# --- Follow-Up ---
-@app.route('/followup', methods=['GET', 'POST'])
-def follow_up():
-    if request.method == 'POST':
-        uhid = request.form['uhid']
-        name = request.form['name']
-        age = request.form['age']
-        sex = request.form['sex']
-        remarks = request.form['remarks']
+    return render_template('new_patient.html')
 
-        conn = get_db_connection()
-        cursor = conn.cursor()  # Create cursor to execute queries
-        cursor.execute("INSERT INTO patients (uhid, name, age, sex, remarks) VALUES (%s, %s, %s, %s, %s)",
-                       (uhid, name, age, sex, remarks))
-        conn.commit()
-        conn.close()
-        return redirect(url_for('home'))
-    return render_template('followup.html')
-
-# --- View Patients ---
-@app.route('/patients')
-def patient_info():
-    query = request.args.get('search', '')
+@app.route('/edit_patient/<int:patient_id>', methods=['GET', 'POST'])
+def edit_patient(patient_id):
     conn = get_db_connection()
-    cursor = conn.cursor()  # Create cursor to execute queries
-    if query:
-        cursor.execute("SELECT * FROM patients WHERE name LIKE %s OR uhid LIKE %s", 
-                       ('%' + query + '%', '%' + query + '%'))
+    if conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM patients WHERE id = %s;", (patient_id,))
+        patient = cursor.fetchone()
+
+        if not patient:
+            return "Patient not found."
+
+        if request.method == 'POST':
+            name = request.form['name']
+            age = request.form['age']
+            gender = request.form['gender']
+            address = request.form['address']
+            contact = request.form['contact']
+
+            cursor.execute("""
+                UPDATE patients
+                SET name = %s, age = %s, gender = %s, address = %s, contact = %s
+                WHERE id = %s;
+            """, (name, age, gender, address, contact, patient_id))
+            conn.commit()
+            cursor.close()
+            conn.close()
+            return redirect(url_for('index'))
+
+        cursor.close()
+        conn.close()
+        return render_template('edit_patient.html', patient=patient)
     else:
-        cursor.execute("SELECT * FROM patients ORDER BY name")
-    patients = cursor.fetchall()
-    conn.close()
-    return render_template('patients.html', patients=patients, query=query)
+        return "Error connecting to database."
 
-# --- Edit Patient ---
-@app.route('/edit/<int:id>', methods=['GET', 'POST'])
-def edit_patient(id):
+@app.route('/delete_patient/<int:patient_id>', methods=['POST'])
+def delete_patient(patient_id):
     conn = get_db_connection()
-    cursor = conn.cursor()  # Create cursor to execute queries
-    if request.method == 'POST':
-        uhid = request.form['uhid']
-        name = request.form['name']
-        age = request.form['age']
-        sex = request.form['sex']
-        remarks = request.form['remarks']
-        cursor.execute("UPDATE patients SET uhid=%s, name=%s, age=%s, sex=%s, remarks=%s WHERE id=%s",
-                       (uhid, name, age, sex, remarks, id))
+    if conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM patients WHERE id = %s;", (patient_id,))
         conn.commit()
+        cursor.close()
         conn.close()
-        return redirect(url_for('patient_info'))
+        return redirect(url_for('index'))
+    else:
+        return "Error connecting to database."
 
-    cursor.execute("SELECT * FROM patients WHERE id=%s", (id,))
-    patient = cursor.fetchone()
-    conn.close()
-    return render_template('edit.html', patient=patient)
-
-# --- Delete Patient ---
-@app.route('/delete/<int:id>')
-def delete_patient(id):
-    conn = get_db_connection()
-    cursor = conn.cursor()  # Create cursor to execute queries
-    cursor.execute("DELETE FROM patients WHERE id=%s", (id,))
-    conn.commit()
-    conn.close()
-    return redirect(url_for('patient_info'))
-
-# --- Initialize DB ---
-@app.route('/init')
-def init_db():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS patients (
-            id SERIAL PRIMARY KEY,
-            uhid VARCHAR(50),
-            name VARCHAR(100),
-            age INTEGER,
-            sex VARCHAR(10),
-            remarks TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
-    return "Database initialized!"
-
-# --- Run App ---
 if __name__ == '__main__':
     app.run(debug=True)
