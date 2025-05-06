@@ -6,7 +6,6 @@ import psycopg2
 app = Flask(__name__)
 app.debug = True
 
-
 # Fetch database credentials from environment variables
 DB_HOST = os.environ.get("DB_HOST")
 DB_NAME = os.environ.get("DB_NAME")
