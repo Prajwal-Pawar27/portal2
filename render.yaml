@@ -1,8 +1,15 @@
 services:
   - type: web
-    name: portal2
+    name: patient-management
     env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn app:app"
-    plan: free
-    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: DB_HOST
+        value: dpg-d0d3ce24d50c73edp4o0-a
+      - key: DB_NAME
+        value: patient_db
+      - key: DB_USER
+        value: patient_db_lukp_user
+      - key: DB_PASSWORD
+        value: 0uQieJtukroY5HldFbHvDNrGAAt5pH3r
