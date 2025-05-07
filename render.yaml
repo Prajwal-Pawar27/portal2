@@ -8,7 +8,7 @@ services:
       - key: DB_HOST
         value: dpg-d0d3ce24d50c73edp4o0-a
       - key: DB_NAME
-        value: patient_db
+        value: patient_db_lukp
       - key: DB_USER
         value: patient_db_lukp_user
       - key: DB_PASSWORD
