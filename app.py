@@ -48,28 +48,37 @@ def index():
 @app.route('/new_patient', methods=['GET', 'POST'])
 def new_patient():
     if request.method == 'POST':
-        uhid = request.form['uhid']
+        # Get the data from the form
+        uhid = request.form['uhid']  # Capture the UHID
         name = request.form['name']
         age = request.form['age']
         sex = request.form['sex']
-        remarks = request.form.get('remarks')  # Optional
-        follow_up_date = request.form.get('follow_up_date')  # Get the follow-up date (optional)
+        remarks = request.form['remarks']
+        follow_up_date = request.form['follow_up_date']
 
+        # Ensure UHID is provided (can be validated further if needed)
+        if not uhid:
+            return "Error: UHID is required."
+
+        # Connect to the database
         conn = get_db_connection()
-        if conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO patients (uhid, name, age, sex, remarks, follow_up_date)
-                VALUES (%s, %s, %s, %s, %s, %s);
-            """, (uhid, name, age, sex, remarks, follow_up_date))
-            conn.commit()
-            cursor.close()
-            conn.close()
-            return redirect(url_for('index'))
-        else:
-            return "Error connecting to database."
+        cursor = conn.cursor()
+
+        # Insert patient into the database with UHID included
+        cursor.execute("""
+            INSERT INTO patients (uhid, name, age, sex, remarks, follow_up_date)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (uhid, name, age, sex, remarks, follow_up_date))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        # Redirect to the home page after successful patient addition
+        return redirect(url_for('home'))
 
     return render_template('new.html')
+
 
 
 
@@ -92,7 +101,6 @@ def edit_patient(uhid):
 
             print(f"Updating patient {uhid} with data: Name={name}, Age={age}, Sex={sex}, Remarks={remarks}")
 
-
             cursor.execute("""
                 UPDATE patients
                 SET name = %s, age = %s, sex = %s, remarks = %s
@@ -110,70 +118,59 @@ def edit_patient(uhid):
         return "Error connecting to database."
 
 
-
-
 @app.route('/delete_patient/<uhid>', methods=['POST'])
 def delete_patient(uhid):
-    try:
-        conn = get_db_connection()
-        if conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM patients WHERE uhid = %s;", (uhid,))
+    conn = get_db_connection()
+    if conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM patients WHERE uhid = %s", (uhid,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        # After deletion, redirect to the patient information page
+        return redirect(url_for('patient_info'))  # Stay on the patient info page after deletion
+
+    return "Error connecting to database."
+
+
+
+@app.route('/follow_up/<uhid>', methods=['GET', 'POST'])
+def follow_up_patient(uhid):
+    conn = get_db_connection()
+    if conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM patients WHERE uhid = %s", (uhid,))
+        patient = cursor.fetchone()
+
+        if request.method == 'POST':
+            diagnosis = request.form['diagnosis']
+            follow_up_date = request.form.get('follow_up_date')  # .get() for safety
+            remarks = request.form.get('remarks')  # Capture remarks
+
+            if not follow_up_date:
+                return "Error: Follow Up Date is required."
+
+            cursor.execute("""
+                UPDATE patients SET diagnosis = %s, follow_up_date = %s, remarks = %s
+                WHERE uhid = %s
+            """, (diagnosis, follow_up_date, remarks, uhid))
+
             conn.commit()
-            cursor.close()
-            conn.close()
-            return redirect(url_for('index'))
-        else:
-            return "Error connecting to database."
-    except Exception as e:
-        return f"An error occurred: {e}"
 
-
-    
-@app.route('/follow_up', methods=['GET', 'POST'])
-def follow_up():
-    if request.method == 'POST':
-        uhid = request.form['uhid']
-        name = request.form['name']
-        age = request.form['age']
-        sex = request.form['sex']
-        remarks = request.form['remarks']
-        follow_up_date = request.form['follow_up_date']  # Get the follow-up date
-
-        conn = get_db_connection()
-        if conn:
-            cursor = conn.cursor()
-
-            # Check if patient exists
+            # After updating, fetch the updated data
             cursor.execute("SELECT * FROM patients WHERE uhid = %s", (uhid,))
-            patient = cursor.fetchone()
+            updated_patient = cursor.fetchone()
 
-            if patient:
-                # If patient exists, update with follow-up date
-                cursor.execute("""
-                    UPDATE patients
-                    SET name = %s, age = %s, sex = %s, remarks = %s, follow_up_date = %s
-                    WHERE uhid = %s
-                """, (name, age, sex, remarks, follow_up_date, uhid))
-            else:
-                # If patient doesn't exist, insert as new patient
-                cursor.execute("""
-                    INSERT INTO patients (uhid, name, age, sex, remarks, follow_up_date)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                """, (uhid, name, age, sex, remarks, follow_up_date))
-
-            conn.commit()
             cursor.close()
             conn.close()
-            return redirect(url_for('index'))
 
-        else:
-            return "Error connecting to database."
+            # Redirect to the home page after successful follow-up update
+            return redirect(url_for('home'))
 
-    return render_template('followup.html')
-
-
-
+        return render_template('followup.html', patient=patient)
+    else:
+        return "Error connecting to database."
 
 
 @app.route('/patient_info', methods=['GET'])
@@ -195,6 +192,23 @@ def patient_info():
         return render_template('patients.html', patients=patients, query=query)
     else:
         return "Error connecting to database."
+
+
+@app.route('/patient_action', methods=['POST'])
+def patient_action():
+    visit_type = request.form['visit']
+    if visit_type == 'new_patient':
+        return redirect(url_for('new_patient'))
+    elif visit_type == 'follow_up':
+        # Ensure that you pass a valid `uhid` to follow_up_patient
+        uhid = request.form['uhid']  # Or get from some other source
+        return redirect(url_for('follow_up_patient', uhid=uhid))
+    else:
+        return "Invalid action"
+
+@app.route('/')
+def home():
+    return render_template('index.html')
 
 
 
