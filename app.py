@@ -49,8 +49,7 @@ def init_database():
                 sex VARCHAR(10),
                 remarks TEXT,
                 follow_up_date DATE,
-                diagnosis TEXT,
-                
+                diagnosis TEXT
             );
         """)
         conn.commit()
