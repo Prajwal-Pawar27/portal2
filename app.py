@@ -2,21 +2,17 @@ import os
 from flask import Flask, render_template, request, redirect, url_for
 import psycopg2
 
-# Initialize Flask app
 app = Flask(__name__)
 app.debug = True
 
-# Fetch database credentials from environment variables
 DB_HOST = os.environ.get("DB_HOST")
 DB_NAME = os.environ.get("DB_NAME")
 DB_USER = os.environ.get("DB_USER")
 DB_PASSWORD = os.environ.get("DB_PASSWORD")
 
-# Check if the required environment variables are set
 if not all([DB_HOST, DB_NAME, DB_USER, DB_PASSWORD]):
     raise ValueError("One or more environment variables (DB_HOST, DB_NAME, DB_USER, DB_PASSWORD) are missing")
 
-# Database connection function
 def get_db_connection():
     try:
         conn = psycopg2.connect(
@@ -32,39 +28,25 @@ def get_db_connection():
 
 @app.route('/')
 def index():
-    conn = get_db_connection()
-    if conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM patients;")
-        patients = cursor.fetchall()
-        print(f"Fetched Patients: {patients}")  # Debugging line
-        cursor.close()
-        conn.close()
-        return render_template('index.html', patients=patients)
-    else:
-        return "Error connecting to database."
+    return render_template('index.html')
 
 
 @app.route('/new_patient', methods=['GET', 'POST'])
 def new_patient():
     if request.method == 'POST':
-        # Get the data from the form
-        uhid = request.form['uhid']  # Capture the UHID
+        uhid = request.form['uhid']
         name = request.form['name']
         age = request.form['age']
         sex = request.form['sex']
         remarks = request.form['remarks']
         follow_up_date = request.form['follow_up_date']
 
-        # Ensure UHID is provided (can be validated further if needed)
         if not uhid:
             return "Error: UHID is required."
 
-        # Connect to the database
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Insert patient into the database with UHID included
         cursor.execute("""
             INSERT INTO patients (uhid, name, age, sex, remarks, follow_up_date)
             VALUES (%s, %s, %s, %s, %s, %s)
@@ -74,13 +56,9 @@ def new_patient():
         cursor.close()
         conn.close()
 
-        # Redirect to the home page after successful patient addition
-        return redirect(url_for('home'))
+        return redirect(url_for('patient_info'))
 
     return render_template('new.html')
-
-
-
 
 @app.route('/edit_patient/<uhid>', methods=['GET', 'POST'])
 def edit_patient(uhid):
@@ -99,8 +77,6 @@ def edit_patient(uhid):
             sex = request.form['sex']
             remarks = request.form['remarks']
 
-            print(f"Updating patient {uhid} with data: Name={name}, Age={age}, Sex={sex}, Remarks={remarks}")
-
             cursor.execute("""
                 UPDATE patients
                 SET name = %s, age = %s, sex = %s, remarks = %s
@@ -109,14 +85,13 @@ def edit_patient(uhid):
             conn.commit()
             cursor.close()
             conn.close()
-            return redirect(url_for('index'))
+            return redirect(url_for('patient_info'))
 
         cursor.close()
         conn.close()
         return render_template('edit.html', patient=patient)
     else:
         return "Error connecting to database."
-
 
 @app.route('/delete_patient/<uhid>', methods=['POST'])
 def delete_patient(uhid):
@@ -127,13 +102,8 @@ def delete_patient(uhid):
         conn.commit()
         cursor.close()
         conn.close()
-        
-        # After deletion, redirect to the patient information page
-        return redirect(url_for('patient_info'))  # Stay on the patient info page after deletion
-
+        return redirect(url_for('patient_info'))
     return "Error connecting to database."
-
-
 
 @app.route('/follow_up/<uhid>', methods=['GET', 'POST'])
 def follow_up_patient(uhid):
@@ -145,8 +115,8 @@ def follow_up_patient(uhid):
 
         if request.method == 'POST':
             diagnosis = request.form['diagnosis']
-            follow_up_date = request.form.get('follow_up_date')  # .get() for safety
-            remarks = request.form.get('remarks')  # Capture remarks
+            follow_up_date = request.form.get('follow_up_date')
+            remarks = request.form.get('remarks')
 
             if not follow_up_date:
                 return "Error: Follow Up Date is required."
@@ -157,41 +127,73 @@ def follow_up_patient(uhid):
             """, (diagnosis, follow_up_date, remarks, uhid))
 
             conn.commit()
-
-            # After updating, fetch the updated data
             cursor.execute("SELECT * FROM patients WHERE uhid = %s", (uhid,))
             updated_patient = cursor.fetchone()
 
             cursor.close()
             conn.close()
 
-            # Redirect to the home page after successful follow-up update
-            return redirect(url_for('home'))
+            return redirect(url_for('patient_info'))
 
         return render_template('followup.html', patient=patient)
     else:
         return "Error connecting to database."
 
-
 @app.route('/patient_info', methods=['GET'])
 def patient_info():
     query = request.args.get('search', '')
+    page = int(request.args.get('page', 1))
+    per_page = 50
+    offset = (page - 1) * per_page
+
     conn = get_db_connection()
     if conn:
         cursor = conn.cursor()
+
         if query:
             cursor.execute("""
                 SELECT * FROM patients
+                WHERE uhid ILIKE %s OR name ILIKE %s
+                ORDER BY id
+                LIMIT %s OFFSET %s;
+            """, (f'%{query}%', f'%{query}%', per_page, offset))
+            patients = cursor.fetchall()
+
+            cursor.execute("""
+                SELECT COUNT(*) FROM patients
                 WHERE uhid ILIKE %s OR name ILIKE %s;
             """, (f'%{query}%', f'%{query}%'))
+            count_result = cursor.fetchone()
         else:
-            cursor.execute("SELECT * FROM patients;")
-        patients = cursor.fetchall()
+            cursor.execute("SELECT * FROM patients ORDER BY id LIMIT %s OFFSET %s;", (per_page, offset))
+            patients = cursor.fetchall()
+
+            cursor.execute("SELECT COUNT(*) FROM patients;")
+            count_result = cursor.fetchone()
+
+        total_patients = count_result[0] if count_result else 0
+        total_pages = (total_patients + per_page - 1) // per_page
+
+        # Redirect if out-of-bounds
+        if page > total_pages and total_pages != 0:
+            cursor.close()
+            conn.close()
+            return redirect(url_for('patient_info', page=total_pages, search=query))
+
         cursor.close()
         conn.close()
-        return render_template('patients.html', patients=patients, query=query)
+
+        return render_template(
+            'patients.html',
+            patients=patients,
+            query=query,
+            page=page,
+            per_page=per_page,
+            total_pages=total_pages
+        )
     else:
         return "Error connecting to database."
+
 
 
 @app.route('/patient_action', methods=['POST'])
@@ -200,17 +202,10 @@ def patient_action():
     if visit_type == 'new_patient':
         return redirect(url_for('new_patient'))
     elif visit_type == 'follow_up':
-        # Ensure that you pass a valid `uhid` to follow_up_patient
-        uhid = request.form['uhid']  # Or get from some other source
+        uhid = request.form['uhid']
         return redirect(url_for('follow_up_patient', uhid=uhid))
     else:
         return "Invalid action"
-
-@app.route('/')
-def home():
-    return render_template('index.html')
-
-
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

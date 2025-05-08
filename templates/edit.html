@@ -17,8 +17,11 @@
             <input type="number" name="age" class="form-control" value="{{ patient[3] }}" required>
         </div>
         <div class="form-group">
-            <label>Sex:</label>
-            <input type="text" name="sex" class="form-control" value="{{ patient[4] }}" required>
+            <label for="sex">Sex</label>
+            <select id="sex" name="sex" class="form-control" required>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+            </select>
         </div>
         <div class="form-group">
             <label>Remarks:</label>
