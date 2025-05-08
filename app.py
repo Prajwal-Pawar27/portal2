@@ -50,8 +50,7 @@ def init_database():
                 remarks TEXT,
                 follow_up_date DATE,
                 diagnosis TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                
             );
         """)
         conn.commit()
