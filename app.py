@@ -1,14 +1,10 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for
 import psycopg2
-from werkzeug.debug import DebuggedApplication
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key')  # Required for flash messages
 app.debug = True
-app.wsgi_app = DebuggedApplication(app.wsgi_app, True)  # Enhanced error reporting
 
-# Database configuration
 DB_HOST = os.environ.get("DB_HOST")
 DB_NAME = os.environ.get("DB_NAME")
 DB_USER = os.environ.get("DB_USER")
@@ -25,46 +21,10 @@ def get_db_connection():
             user=DB_USER,
             password=DB_PASSWORD
         )
-        app.logger.info("Successfully connected to database!")
         return conn
     except Exception as e:
-        app.logger.error(f"Error connecting to the database: {e}")
-        app.logger.error(f"Connection details - Host: {DB_HOST}, DB: {DB_NAME}, User: {DB_USER}")
+        print(f"Error connecting to the database: {e}")
         return None
-
-def init_database():
-    """Initialize the database with required tables"""
-    conn = get_db_connection()
-    if not conn:
-        return False
-    
-    try:
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS patients (
-                id SERIAL PRIMARY KEY,
-                uhid VARCHAR(50) UNIQUE NOT NULL,
-                name VARCHAR(100) NOT NULL,
-                age INTEGER NOT NULL,
-                sex VARCHAR(10),
-                remarks TEXT,
-                follow_up_date DATE,
-                diagnosis TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-        """)
-        conn.commit()
-        cursor.close()
-        conn.close()
-        app.logger.info("Database table created successfully!")
-        return True
-    except Exception as e:
-        app.logger.error(f"Error creating table: {str(e)}")
-        return False
-
-# Initialize database when starting the app
-init_database()
 
 @app.route('/')
 def index():
@@ -73,42 +33,32 @@ def index():
 @app.route('/new_patient', methods=['GET', 'POST'])
 def new_patient():
     if request.method == 'POST':
-        try:
-            uhid = request.form.get('uhid')
-            name = request.form.get('name')
-            age = request.form.get('age')
-            sex = request.form.get('sex')
-            remarks = request.form.get('remarks')
-            follow_up_date = request.form.get('follow_up_date')
-            diagnosis = request.form.get('diagnosis')
+        uhid = request.form.get('uhid')
+        name = request.form.get('name')
+        age = request.form.get('age')
+        sex = request.form.get('sex')
+        remarks = request.form.get('remarks')
+        follow_up_date = request.form.get('follow_up_date')
+        diagnosis = request.form.get('diagnosis')
 
-            if not uhid or not name or not age:
-                flash("Error: UHID, Name, and Age are required.", "error")
-                return redirect(url_for('new_patient'))
+        if not uhid or not name or not age:
+            return "Error: UHID, Name, and Age are required."
 
-            conn = get_db_connection()
-            if not conn:
-                flash("Error connecting to database.", "error")
-                return redirect(url_for('new_patient'))
-            
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO patients (uhid, name, age, sex, remarks, follow_up_date, diagnosis)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (uhid, name, age, sex, remarks, follow_up_date, diagnosis))
+        conn = get_db_connection()
+        if not conn:
+            return "Error connecting to database."
+        cursor = conn.cursor()
 
-            conn.commit()
-            cursor.close()
-            conn.close()
+        cursor.execute("""
+            INSERT INTO patients (uhid, name, age, sex, remarks, follow_up_date, diagnosis)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (uhid, name, age, sex, remarks, follow_up_date, diagnosis))
 
-            flash("Patient added successfully!", "success")
-            return redirect(url_for('patient_info'))
-        except psycopg2.IntegrityError as e:
-            flash(f"Error: UHID must be unique. {str(e)}", "error")
-            return redirect(url_for('new_patient'))
-        except Exception as e:
-            flash(f"An error occurred: {str(e)}", "error")
-            return redirect(url_for('new_patient'))
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return redirect(url_for('index'))
 
     return render_template('new.html')
 
@@ -116,201 +66,155 @@ def new_patient():
 def edit_patient(uhid):
     conn = get_db_connection()
     if not conn:
-        flash("Error connecting to database.", "error")
-        return redirect(url_for('patient_info'))
-    
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM patients WHERE uhid = %s;", (uhid,))
-        patient = cursor.fetchone()
+        return "Error connecting to database."
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM patients WHERE uhid = %s;", (uhid,))
+    patient = cursor.fetchone()
 
-        if not patient:
-            flash("Patient not found.", "error")
-            return redirect(url_for('patient_info'))
-
-        if request.method == 'POST':
-            name = request.form.get('name')
-            age = request.form.get('age')
-            sex = request.form.get('sex')
-            remarks = request.form.get('remarks')
-            diagnosis = request.form.get('diagnosis')
-
-            cursor.execute("""
-                UPDATE patients
-                SET name = %s, age = %s, sex = %s, remarks = %s, diagnosis = %s, updated_at = CURRENT_TIMESTAMP
-                WHERE uhid = %s;
-            """, (name, age, sex, remarks, diagnosis, uhid))
-
-            conn.commit()
-            cursor.close()
-            conn.close()
-            
-            flash("Patient updated successfully!", "success")
-            return redirect(url_for('patient_info'))
-
+    if not patient:
         cursor.close()
         conn.close()
-        return render_template('edit.html', patient=patient)
-    except Exception as e:
-        flash(f"An error occurred: {str(e)}", "error")
+        return "Patient not found."
+
+    if request.method == 'POST':
+        name = request.form.get('name')
+        age = request.form.get('age')
+        sex = request.form.get('sex')
+        remarks = request.form.get('remarks')
+        diagnosis = request.form.get('diagnosis')
+
+        cursor.execute("""
+            UPDATE patients
+            SET name = %s, age = %s, sex = %s, remarks = %s, diagnosis = %s
+            WHERE uhid = %s;
+        """, (name, age, sex, remarks, diagnosis, uhid))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
         return redirect(url_for('patient_info'))
+
+    cursor.close()
+    conn.close()
+    return render_template('edit.html', patient=patient)
 
 @app.route('/delete_patient/<uhid>', methods=['POST'])
 def delete_patient(uhid):
     conn = get_db_connection()
     if not conn:
-        flash("Error connecting to database.", "error")
-        return redirect(url_for('patient_info'))
-    
-    try:
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM patients WHERE uhid = %s;", (uhid,))
-        conn.commit()
-        cursor.close()
-        conn.close()
-        
-        flash("Patient deleted successfully!", "success")
-        return redirect(url_for('patient_info'))
-    except Exception as e:
-        flash(f"An error occurred: {str(e)}", "error")
-        return redirect(url_for('patient_info'))
+        return "Error connecting to database."
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM patients WHERE uhid = %s;", (uhid,))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return redirect(url_for('patient_info'))
 
 @app.route('/follow_up/<uhid>', methods=['GET', 'POST'])
 def follow_up_patient(uhid):
     conn = get_db_connection()
     if not conn:
-        flash("Error connecting to database.", "error")
-        return redirect(url_for('patient_info'))
-    
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM patients WHERE uhid = %s;", (uhid,))
-        patient = cursor.fetchone()
+        return "Error connecting to database."
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM patients WHERE uhid = %s;", (uhid,))
+    patient = cursor.fetchone()
 
-        if not patient:
-            flash("Patient not found.", "error")
-            return redirect(url_for('patient_info'))
-
-        if request.method == 'POST':
-            diagnosis = request.form.get('diagnosis')
-            follow_up_date = request.form.get('follow_up_date')
-            remarks = request.form.get('remarks')
-
-            if not follow_up_date:
-                flash("Error: Follow Up Date is required.", "error")
-                return redirect(url_for('follow_up_patient', uhid=uhid))
-
-            cursor.execute("""
-                UPDATE patients
-                SET diagnosis = %s, follow_up_date = %s, remarks = %s, updated_at = CURRENT_TIMESTAMP
-                WHERE uhid = %s;
-            """, (diagnosis, follow_up_date, remarks, uhid))
-
-            conn.commit()
-            cursor.close()
-            conn.close()
-
-            flash("Follow-up updated successfully!", "success")
-            return redirect(url_for('patient_info'))
-
+    if not patient:
         cursor.close()
         conn.close()
-        return render_template('followup.html', patient=patient)
-    except Exception as e:
-        flash(f"An error occurred: {str(e)}", "error")
+        return "Patient not found."
+
+    if request.method == 'POST':
+        diagnosis = request.form.get('diagnosis')
+        follow_up_date = request.form.get('follow_up_date')
+        remarks = request.form.get('remarks')
+
+        if not follow_up_date:
+            return "Error: Follow Up Date is required."
+
+        cursor.execute("""
+            UPDATE patients
+            SET diagnosis = %s, follow_up_date = %s, remarks = %s
+            WHERE uhid = %s;
+        """, (diagnosis, follow_up_date, remarks, uhid))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
         return redirect(url_for('patient_info'))
+
+    cursor.close()
+    conn.close()
+    return render_template('followup.html', patient=patient)
 
 @app.route('/patient_info', methods=['GET'])
 def patient_info():
-    try:
-        query = request.args.get('search', '')
-        page = int(request.args.get('page', 1))
-        if page < 1:
-            return redirect(url_for('patient_info', page=1))
+    query = request.args.get('search', '')
+    page = int(request.args.get('page', 1))
+    if page < 1:
+        return redirect(url_for('patient_info', page=1))
 
-        per_page = 50
-        offset = (page - 1) * per_page
+    per_page = 50
+    offset = (page - 1) * per_page
 
-        conn = get_db_connection()
-        if not conn:
-            flash("Error connecting to database.", "error")
-            return render_template('patients.html', patients=[], query=query, page=1, per_page=per_page, total_pages=0)
-        
-        cursor = conn.cursor()
+    conn = get_db_connection()
+    if not conn:
+        return "Error connecting to database."
+    cursor = conn.cursor()
 
-        if query:
-            cursor.execute("""
-                SELECT * FROM patients
-                WHERE uhid ILIKE %s OR name ILIKE %s
-                ORDER BY created_at DESC
-                LIMIT %s OFFSET %s;
-            """, (f'%{query}%', f'%{query}%', per_page, offset))
-            patients = cursor.fetchall()
+    if query:
+        cursor.execute("""
+            SELECT * FROM patients
+            WHERE uhid ILIKE %s OR name ILIKE %s
+            ORDER BY id
+            LIMIT %s OFFSET %s;
+        """, (f'%{query}%', f'%{query}%', per_page, offset))
+        patients = cursor.fetchall()
 
-            cursor.execute("""
-                SELECT COUNT(*) FROM patients
-                WHERE uhid ILIKE %s OR name ILIKE %s;
-            """, (f'%{query}%', f'%{query}%'))
-            count_result = cursor.fetchone()
-        else:
-            cursor.execute("""
-                SELECT * FROM patients 
-                ORDER BY created_at DESC 
-                LIMIT %s OFFSET %s;
-            """, (per_page, offset))
-            patients = cursor.fetchall()
-            cursor.execute("SELECT COUNT(*) FROM patients;")
-            count_result = cursor.fetchone()
+        cursor.execute("""
+            SELECT COUNT(*) FROM patients
+            WHERE uhid ILIKE %s OR name ILIKE %s;
+        """, (f'%{query}%', f'%{query}%'))
+        count_result = cursor.fetchone()
+    else:
+        cursor.execute("SELECT * FROM patients ORDER BY id LIMIT %s OFFSET %s;", (per_page, offset))
+        patients = cursor.fetchall()
+        cursor.execute("SELECT COUNT(*) FROM patients;")
+        count_result = cursor.fetchone()
 
-        total_patients = count_result[0] if count_result else 0
-        total_pages = (total_patients + per_page - 1) // per_page
+    total_patients = count_result[0] if count_result else 0
+    total_pages = (total_patients + per_page - 1) // per_page
 
-        if page > total_pages and total_pages != 0:
-            cursor.close()
-            conn.close()
-            return redirect(url_for('patient_info', page=total_pages, search=query))
-
+    if page > total_pages and total_pages != 0:
         cursor.close()
         conn.close()
+        return redirect(url_for('patient_info', page=total_pages, search=query))
 
-        return render_template(
-            'patients.html',
-            patients=patients,
-            query=query,
-            page=page,
-            per_page=per_page,
-            total_pages=total_pages
-        )
-    except Exception as e:
-        flash(f"An error occurred: {str(e)}", "error")
-        return render_template('patients.html', patients=[], query=query, page=1, per_page=per_page, total_pages=0)
+    cursor.close()
+    conn.close()
+
+    return render_template(
+        'patients.html',
+        patients=patients,
+        query=query,
+        page=page,
+        per_page=per_page,
+        total_pages=total_pages
+    )
 
 @app.route('/patient_action', methods=['POST'])
 def patient_action():
-    try:
-        visit_type = request.form.get('visit')
-        if visit_type == 'new_patient':
-            return redirect(url_for('new_patient'))
-        elif visit_type == 'follow_up':
-            uhid = request.form.get('uhid')
-            if not uhid:
-                flash("Error: UHID is required for follow-up.", "error")
-                return redirect(url_for('index'))
-            return redirect(url_for('follow_up_patient', uhid=uhid))
-        else:
-            flash("Invalid action", "error")
-            return redirect(url_for('index'))
-    except Exception as e:
-        flash(f"An error occurred: {str(e)}", "error")
-        return redirect(url_for('index'))
-
-@app.route('/init_db')
-def init_db_route():
-    if init_database():
-        flash("Database initialized successfully!", "success")
+    visit_type = request.form.get('visit')
+    if visit_type == 'new_patient':
+        return redirect(url_for('new_patient'))
+    elif visit_type == 'follow_up':
+        uhid = request.form.get('uhid')
+        if not uhid:
+            return "Error: UHID is required for follow-up."
+        return redirect(url_for('follow_up_patient', uhid=uhid))
     else:
-        flash("Error initializing database!", "error")
-    return redirect(url_for('index'))
+        return "Invalid action"
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
