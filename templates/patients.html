@@ -1,50 +1,5 @@
 {% extends 'base.html' %}
 
-{% block head %}
-    <style>
-        @media print {
-            body {
-                font-family: Arial, sans-serif;
-            }
-
-            #patient-list {
-                width: 100%;
-            }
-
-            table {
-                border-collapse: collapse;
-                width: 100%;
-            }
-
-            table th, table td {
-                border: 1px solid #000;
-                padding: 8px;
-                text-align: left;
-            }
-
-            /* Ensure pagination controls are hidden in print view */
-            .pagination {
-                display: none;
-            }
-
-            /* Page break after each table for printing */
-            .page-break {
-                page-break-before: always;
-            }
-
-            @page {
-                size: auto;
-                margin: 1in;
-            }
-
-            /* Add breaks between pages if needed */
-            .page {
-                page-break-after: always;
-            }
-        }
-    </style>
-{% endblock %}
-
 {% block content %}
 <div class="search-container">
     <form method="get" action="{{ url_for('patient_info') }}">
