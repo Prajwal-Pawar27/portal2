@@ -40,6 +40,7 @@ def new_patient():
         sex = request.form['sex']
         remarks = request.form['remarks']
         follow_up_date = request.form['follow_up_date']
+        diagnosis = request.form['diagnosis']  # ✅ Add this line
 
         if not uhid:
             return "Error: UHID is required."
@@ -47,18 +48,20 @@ def new_patient():
         conn = get_db_connection()
         cursor = conn.cursor()
 
+        # ✅ Include diagnosis in the INSERT statement
         cursor.execute("""
-            INSERT INTO patients (uhid, name, age, sex, remarks, follow_up_date)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (uhid, name, age, sex, remarks, follow_up_date))
+            INSERT INTO patients (uhid, name, age, sex, remarks, follow_up_date, diagnosis)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (uhid, name, age, sex, remarks, follow_up_date, diagnosis))
 
         conn.commit()
         cursor.close()
         conn.close()
 
-        return redirect(url_for('patient_info'))
+        return redirect(url_for('index'))
 
     return render_template('new.html')
+
 
 @app.route('/edit_patient/<uhid>', methods=['GET', 'POST'])
 def edit_patient(uhid):
