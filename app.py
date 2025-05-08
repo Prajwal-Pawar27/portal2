@@ -11,7 +11,7 @@ DB_USER = os.environ.get("DB_USER")
 DB_PASSWORD = os.environ.get("DB_PASSWORD")
 
 if not all([DB_HOST, DB_NAME, DB_USER, DB_PASSWORD]):
-    raise ValueError("One or more environment variables (DB_HOST, DB_NAME, DB_USER, DB_PASSWORD) are missing")
+    raise ValueError("Missing one or more environment variables for DB connection.")
 
 def get_db_connection():
     try:
@@ -30,25 +30,25 @@ def get_db_connection():
 def index():
     return render_template('index.html')
 
-
 @app.route('/new_patient', methods=['GET', 'POST'])
 def new_patient():
     if request.method == 'POST':
-        uhid = request.form['uhid']
-        name = request.form['name']
-        age = request.form['age']
-        sex = request.form['sex']
-        remarks = request.form['remarks']
-        follow_up_date = request.form['follow_up_date']
-        diagnosis = request.form['diagnosis']  # ✅ Add this line
+        uhid = request.form.get('uhid')
+        name = request.form.get('name')
+        age = request.form.get('age')
+        sex = request.form.get('sex')
+        remarks = request.form.get('remarks')
+        follow_up_date = request.form.get('follow_up_date')
+        diagnosis = request.form.get('diagnosis')
 
-        if not uhid:
-            return "Error: UHID is required."
+        if not uhid or not name or not age:
+            return "Error: UHID, Name, and Age are required."
 
         conn = get_db_connection()
+        if not conn:
+            return "Error connecting to database."
         cursor = conn.cursor()
 
-        # ✅ Include diagnosis in the INSERT statement
         cursor.execute("""
             INSERT INTO patients (uhid, name, age, sex, remarks, follow_up_date, diagnosis)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -62,150 +62,156 @@ def new_patient():
 
     return render_template('new.html')
 
-
 @app.route('/edit_patient/<uhid>', methods=['GET', 'POST'])
 def edit_patient(uhid):
     conn = get_db_connection()
-    if conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM patients WHERE uhid = %s;", (uhid,))
-        patient = cursor.fetchone()
+    if not conn:
+        return "Error connecting to database."
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM patients WHERE uhid = %s;", (uhid,))
+    patient = cursor.fetchone()
 
-        if not patient:
-            return "Patient not found."
-
-        if request.method == 'POST':
-            name = request.form['name']
-            age = request.form['age']
-            sex = request.form['sex']
-            remarks = request.form['remarks']
-
-            cursor.execute("""
-                UPDATE patients
-                SET name = %s, age = %s, sex = %s, remarks = %s
-                WHERE uhid = %s;
-            """, (name, age, sex, remarks, uhid))
-            conn.commit()
-            cursor.close()
-            conn.close()
-            return redirect(url_for('patient_info'))
-
+    if not patient:
         cursor.close()
         conn.close()
-        return render_template('edit.html', patient=patient)
-    else:
-        return "Error connecting to database."
+        return "Patient not found."
 
-@app.route('/delete_patient/<uhid>', methods=['POST'])
-def delete_patient(uhid):
-    conn = get_db_connection()
-    if conn:
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM patients WHERE uhid = %s", (uhid,))
+    if request.method == 'POST':
+        name = request.form.get('name')
+        age = request.form.get('age')
+        sex = request.form.get('sex')
+        remarks = request.form.get('remarks')
+        diagnosis = request.form.get('diagnosis')
+
+        cursor.execute("""
+            UPDATE patients
+            SET name = %s, age = %s, sex = %s, remarks = %s, diagnosis = %s
+            WHERE uhid = %s;
+        """, (name, age, sex, remarks, diagnosis, uhid))
+
         conn.commit()
         cursor.close()
         conn.close()
         return redirect(url_for('patient_info'))
-    return "Error connecting to database."
+
+    cursor.close()
+    conn.close()
+    return render_template('edit.html', patient=patient)
+
+@app.route('/delete_patient/<uhid>', methods=['POST'])
+def delete_patient(uhid):
+    conn = get_db_connection()
+    if not conn:
+        return "Error connecting to database."
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM patients WHERE uhid = %s;", (uhid,))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return redirect(url_for('patient_info'))
 
 @app.route('/follow_up/<uhid>', methods=['GET', 'POST'])
 def follow_up_patient(uhid):
     conn = get_db_connection()
-    if conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM patients WHERE uhid = %s", (uhid,))
-        patient = cursor.fetchone()
-
-        if request.method == 'POST':
-            diagnosis = request.form['diagnosis']
-            follow_up_date = request.form.get('follow_up_date')
-            remarks = request.form.get('remarks')
-
-            if not follow_up_date:
-                return "Error: Follow Up Date is required."
-
-            cursor.execute("""
-                UPDATE patients SET diagnosis = %s, follow_up_date = %s, remarks = %s
-                WHERE uhid = %s
-            """, (diagnosis, follow_up_date, remarks, uhid))
-
-            conn.commit()
-            cursor.execute("SELECT * FROM patients WHERE uhid = %s", (uhid,))
-            updated_patient = cursor.fetchone()
-
-            cursor.close()
-            conn.close()
-
-            return redirect(url_for('patient_info'))
-
-        return render_template('followup.html', patient=patient)
-    else:
+    if not conn:
         return "Error connecting to database."
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM patients WHERE uhid = %s;", (uhid,))
+    patient = cursor.fetchone()
+
+    if not patient:
+        cursor.close()
+        conn.close()
+        return "Patient not found."
+
+    if request.method == 'POST':
+        diagnosis = request.form.get('diagnosis')
+        follow_up_date = request.form.get('follow_up_date')
+        remarks = request.form.get('remarks')
+
+        if not follow_up_date:
+            return "Error: Follow Up Date is required."
+
+        cursor.execute("""
+            UPDATE patients
+            SET diagnosis = %s, follow_up_date = %s, remarks = %s
+            WHERE uhid = %s;
+        """, (diagnosis, follow_up_date, remarks, uhid))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return redirect(url_for('patient_info'))
+
+    cursor.close()
+    conn.close()
+    return render_template('followup.html', patient=patient)
 
 @app.route('/patient_info', methods=['GET'])
 def patient_info():
     query = request.args.get('search', '')
     page = int(request.args.get('page', 1))
+    if page < 1:
+        return redirect(url_for('patient_info', page=1))
+
     per_page = 50
     offset = (page - 1) * per_page
 
     conn = get_db_connection()
-    if conn:
-        cursor = conn.cursor()
+    if not conn:
+        return "Error connecting to database."
+    cursor = conn.cursor()
 
-        if query:
-            cursor.execute("""
-                SELECT * FROM patients
-                WHERE uhid ILIKE %s OR name ILIKE %s
-                ORDER BY id
-                LIMIT %s OFFSET %s;
-            """, (f'%{query}%', f'%{query}%', per_page, offset))
-            patients = cursor.fetchall()
+    if query:
+        cursor.execute("""
+            SELECT * FROM patients
+            WHERE uhid ILIKE %s OR name ILIKE %s
+            ORDER BY id
+            LIMIT %s OFFSET %s;
+        """, (f'%{query}%', f'%{query}%', per_page, offset))
+        patients = cursor.fetchall()
 
-            cursor.execute("""
-                SELECT COUNT(*) FROM patients
-                WHERE uhid ILIKE %s OR name ILIKE %s;
-            """, (f'%{query}%', f'%{query}%'))
-            count_result = cursor.fetchone()
-        else:
-            cursor.execute("SELECT * FROM patients ORDER BY id LIMIT %s OFFSET %s;", (per_page, offset))
-            patients = cursor.fetchall()
+        cursor.execute("""
+            SELECT COUNT(*) FROM patients
+            WHERE uhid ILIKE %s OR name ILIKE %s;
+        """, (f'%{query}%', f'%{query}%'))
+        count_result = cursor.fetchone()
+    else:
+        cursor.execute("SELECT * FROM patients ORDER BY id LIMIT %s OFFSET %s;", (per_page, offset))
+        patients = cursor.fetchall()
+        cursor.execute("SELECT COUNT(*) FROM patients;")
+        count_result = cursor.fetchone()
 
-            cursor.execute("SELECT COUNT(*) FROM patients;")
-            count_result = cursor.fetchone()
+    total_patients = count_result[0] if count_result else 0
+    total_pages = (total_patients + per_page - 1) // per_page
 
-        total_patients = count_result[0] if count_result else 0
-        total_pages = (total_patients + per_page - 1) // per_page
-
-        # Redirect if out-of-bounds
-        if page > total_pages and total_pages != 0:
-            cursor.close()
-            conn.close()
-            return redirect(url_for('patient_info', page=total_pages, search=query))
-
+    if page > total_pages and total_pages != 0:
         cursor.close()
         conn.close()
+        return redirect(url_for('patient_info', page=total_pages, search=query))
 
-        return render_template(
-            'patients.html',
-            patients=patients,
-            query=query,
-            page=page,
-            per_page=per_page,
-            total_pages=total_pages
-        )
-    else:
-        return "Error connecting to database."
+    cursor.close()
+    conn.close()
 
-
+    return render_template(
+        'patients.html',
+        patients=patients,
+        query=query,
+        page=page,
+        per_page=per_page,
+        total_pages=total_pages
+    )
 
 @app.route('/patient_action', methods=['POST'])
 def patient_action():
-    visit_type = request.form['visit']
+    visit_type = request.form.get('visit')
     if visit_type == 'new_patient':
         return redirect(url_for('new_patient'))
     elif visit_type == 'follow_up':
-        uhid = request.form['uhid']
+        uhid = request.form.get('uhid')
+        if not uhid:
+            return "Error: UHID is required for follow-up."
         return redirect(url_for('follow_up_patient', uhid=uhid))
     else:
         return "Invalid action"
