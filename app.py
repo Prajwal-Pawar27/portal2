@@ -40,6 +40,7 @@ def init_database():
     
     try:
         cursor = conn.cursor()
+        # Create the table with created_at column
         sql = """
             CREATE TABLE IF NOT EXISTS patients (
                 id SERIAL PRIMARY KEY,
@@ -49,7 +50,8 @@ def init_database():
                 sex VARCHAR(10),
                 remarks TEXT,
                 follow_up_date DATE,
-                diagnosis TEXT
+                diagnosis TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """
         app.logger.info(f"Running SQL: {sql}")
