@@ -1,73 +1,22 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}Patient Manager{% endblock %}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    <style>
-      body {
-        background-color: #f8f9fa;
-      }
-      .card {
-        border-radius: 16px;
-      }
-      .btn {
-        border-radius: 12px;
-      }
-
-      /* Print-specific styles */
-      @media print {
-        body {
-          font-family: Arial, sans-serif;
-        }
-
-        /* Hide elements like buttons during print */
-        .btn, .search-container {
-          display: none;
-        }
-
-        /* Optionally, you can also style the table for printing */
-        table {
-          width: 100%;
-          border-collapse: collapse;
-        }
-
-        table, th, td {
-          border: 1px solid black;
-        }
-
-        th, td {
-          padding: 8px;
-          text-align: left;
-        }
-      }
-    </style>
+    <!-- ... existing head content ... -->
   </head>
   <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-      <div class="container-fluid">
-        <a class="navbar-brand" href="{{ url_for('index') }}">Patient Manager</a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-          <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarNav">
-          <ul class="navbar-nav ms-auto">
-            <li class="nav-item"><a class="nav-link" href="{{ url_for('index') }}">Home</a></li>
-            <li class="nav-item"><a class="nav-link" href="{{ url_for('new_patient') }}">New Patient</a></li>
-            <li class="nav-item"><a class="nav-link" href="{{ url_for('patient_info') }}">Patient Info</a></li>
-          </ul>
-        </div>
-      </div>
+      <!-- ... existing navbar ... -->
     </nav>
 
     <div class="container mt-4">
-      {% with messages = get_flashed_messages() %}
+      {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-          <div class="alert alert-success" role="alert">
-            {{ messages[0] }}
-          </div>
+          {% for category, message in messages %}
+            <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% endfor %}
         {% endif %}
       {% endwith %}
 
