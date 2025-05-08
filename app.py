@@ -40,7 +40,7 @@ def init_database():
     
     try:
         cursor = conn.cursor()
-        cursor.execute("""
+        sql = """
             CREATE TABLE IF NOT EXISTS patients (
                 id SERIAL PRIMARY KEY,
                 uhid VARCHAR(50) UNIQUE NOT NULL,
@@ -51,7 +51,10 @@ def init_database():
                 follow_up_date DATE,
                 diagnosis TEXT
             );
-        """)
+        """
+        app.logger.info(f"Running SQL: {sql}")
+        cursor.execute(sql)
+
         conn.commit()
         cursor.close()
         conn.close()
@@ -63,6 +66,7 @@ def init_database():
 
 # Initialize database when starting the app
 init_database()
+
 
 @app.route('/')
 def index():
