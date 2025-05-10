@@ -26,26 +26,27 @@ def get_db_connection():
         print(f"Error connecting to the database: {e}")
         return None
 
+
 def init_database():
     """Initialize the database with required tables"""
     conn = get_db_connection()
     if not conn:
         return False
-
+    
     try:
         cursor = conn.cursor()
         # Create the table with created_at column
         sql = """
             CREATE TABLE IF NOT EXISTS patients (
                 id SERIAL PRIMARY KEY,
-                uhid VARCHAR(50) UNIQUE NOT NULL,
+                uhid VARCHAR(10) UNIQUE NOT NULL,
                 name VARCHAR(100) NOT NULL,
                 age INTEGER NOT NULL,
                 sex VARCHAR(10),
-                remarks TEXT,
                 follow_up_date DATE,
                 diagnosis TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                remarks TEXT
+            
             );
         """
         app.logger.info(f"Running SQL: {sql}")
@@ -63,6 +64,7 @@ def init_database():
 # Initialize database when starting the app
 init_database()
 
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -74,9 +76,9 @@ def new_patient():
         name = request.form.get('name')
         age = request.form.get('age')
         sex = request.form.get('sex')
-        remarks = request.form.get('remarks')
         follow_up_date = request.form.get('follow_up_date')
         diagnosis = request.form.get('diagnosis')
+        remarks = request.form.get('remarks')
 
         if not uhid or not name or not age:
             return "Error: UHID, Name, and Age are required."
