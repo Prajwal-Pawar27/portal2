@@ -26,13 +26,12 @@ def get_db_connection():
         print(f"Error connecting to the database: {e}")
         return None
 
-<<<<<<< HEAD
 def init_database():
     """Initialize the database with required tables"""
     conn = get_db_connection()
     if not conn:
         return False
-    
+
     try:
         cursor = conn.cursor()
         # Create the table with created_at column
@@ -64,9 +63,6 @@ def init_database():
 # Initialize database when starting the app
 init_database()
 
-
-=======
->>>>>>> 26e2d2c (Add diagnosis field to all routes and templates)
 @app.route('/')
 def index():
     return render_template('index.html')
